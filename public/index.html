@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GM MÓVEIS - Controle de Almoxarifado</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    header { border-bottom: 2px solid #334155; padding-bottom: 15px; margin-bottom: 20px; text-align: center; }
+    h1 { color: #f59e0b; margin: 0 0 5px 0; }
+    
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab-btn { flex: 1; min-width: 180px; padding: 12px; background-color: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .tab-btn.active { background-color: #f59e0b; color: #000; border-color: #f59e0b; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card { background-color: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155; position: relative; }
+    .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .full-width { grid-column: span 2; }
+    
+    label { display: block; margin-bottom: 6px; font-weight: bold; color: #94a3b8; font-size: 14px; }
+    input, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background-color: #0f172a; color: #fff; font-size: 15px; }
+    input:focus, select:focus { outline: none; border-color: #f59e0b; }
+    
+    .checkbox-container { display: flex; align-items: center; gap: 10px; margin: 15px 0; background-color: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #334155; }
+    .checkbox-container input { width: auto; cursor: pointer; transform: scale(1.3); }
+    .checkbox-container label { margin: 0; color: #f59e0b; cursor: pointer; font-size: 15px; }
+
+    button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; margin-top: 5px; }
+    .btn-checkout { background-color: #f59e0b; color: #000; }
+    .btn-checkin { background-color: #10b981; color: #000; }
+    .btn-primary { background-color: #3b82f6; color: #fff; }
+    button:hover { opacity: 0.9; }
+
+    .status-box { padding: 15px; border-radius: 8px; font-size: 17px; font-weight: bold; margin-top: 10px; }
+    .disponivel { background-color: #064e3b; color: #34d399; border: 1px solid #059669; text-align: center; }
+    .em-uso { background-color: #450a0a; color: #fca5a5; border: 1px solid #dc2626; text-align: left; }
+
+    .suggestions-list {
+      position: absolute; top: 95px; left: 20px; right: 20px;
+      background-color: #1e293b; border: 1px solid #f59e0b; border-radius: 8px;
+      max-height: 220px; overflow-y: auto; z-index: 100;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); display: none;
+    }
+    .suggestion-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+    .suggestion-item:hover { background-color: #334155; }
+
+    .quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 15px; }
+    .quick-card { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; justify-content: space-between; }
+    .quick-card:hover { border-color: #f59e0b; transform: translateY(-2px); }
+    .quick-card .title { font-weight: bold; color: #fff; font-size: 14px; margin-bottom: 5px; }
+    .quick-card .code { color: #94a3b8; font-size: 12px; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; font-size: 14px; }
+    th { background-color: #0f172a; color: #f59e0b; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
+    .badge-disponivel { background-color: #064e3b; color: #34d399; }
+    .badge-emuso { background-color: #450a0a; color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>GM MÓVEIS - Almoxarifado</h1>
+      <p style="color: #94a3b8; margin: 0;">Controle de Cautela e Gestão de Ferramentas</p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="openTab('balcao')">📦 Balcão (Cautela)</button>
+      <button class="tab-btn" onclick="openTab('historico')">📜 Histórico & Relatórios</button>
+      <button class="tab-btn" onclick="openTab('cad-materiais')">🔨 Cadastrar Materiais</button>
+      <button class="tab-btn" onclick="openTab('cad-funcionarios')">👥 Cadastrar Funcionários</button>
+    </div>
+
+    <!-- ABA BALCÃO -->
+    <div id="balcao" class="tab-content active">
+      <div class="card">
+        <label for="codigo_ref">Digite o Nome do Material ou o Código da Etiqueta:</label>
+        <input type="text" id="codigo_ref" placeholder="Ex: Furadeira ou FUR-001" autofocus autocomplete="off" oninput="buscarSugestoes()">
+        <div id="suggestions" class="suggestions-list"></div>
+
+        <div id="quick-selection-area" style="margin-top: 15px;">
+          <label>Ou escolha um item da lista rápida de cadastrados:</label>
+          <div id="quick-grid" class="quick-grid"></div>
+        </div>
+
+        <div id="material-info" style="display: none; margin-top: 20px;">
+          <div id="status-display" class="status-box"></div>
+          
+          <div id="form-retirada" style="display: none; margin-top: 20px;" class="grid-form">
+            <h3 class="full-width" style="color: #f59e0b; margin: 0 0 10px 0;">📋 Formulário de Retirada (Cautela)</h3>
+            <div><label for="funcionario_select">1. Funcionário Responsável:</label><select id="funcionario_select"></select></div>
+            <div><label for="data_retirada">2. Data e Hora de Retirada:</label><input type="datetime-local" id="data_retirada"></div>
+            <div><label for="destino">3. Obra / Projeto / Local de Destino:</label><input type="text" id="destino" placeholder="Ex: Obra Cliente X"></div>
+            <div><label for="acessorios">4. Acessórios e Itens Inclusos:</label><input type="text" id="acessorios" placeholder="Ex: 2 Baterias, 1 Maleta"></div>
+            <div class="full-width"><label for="obs">5. Observações Gerais:</label><input type="text" id="obs" placeholder="Ex: Entregue testado"></div>
+            <div class="full-width checkbox-container">
+              <input type="checkbox" id="confirma_responsavel" required>
+              <label for="confirma_responsavel">DECLARO QUE CONFERI E RESPONSABILIZO-ME PELO MATERIAL RETIRADO</label>
+            </div>
+            <div class="full-width"><button class="btn-checkout" onclick="registrarRetirada()">CONFIRMAR RETIRADA</button></div>
+          </div>
+
+          <div id="form-devolucao" style="display: none; margin-top: 20px;">
+            <h3 style="color: #10b981; margin: 0 0 10px 0;">🔄 Processar Devolução</h3>
+            <label for="condicao_devolucao">Observação de Devolução / Estado do Item:</label>
+            <input type="text" id="condicao_devolucao" placeholder="Ex: Devolvido completo sem avarias" value="Devolvido completo sem avarias">
+            <button class="btn-checkin" onclick="registrarDevolucao()">CONFIRMAR DEVOLUÇÃO (REGISTRA HORÁRIO ATUAL)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA HISTÓRICO -->
+    <div id="historico" class="tab-content">
+      <div class="card">
+        <h3>⚠️ Cautelas Ativas (Materiais Atualmente Emprestados)</h3>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead><tr><th>Material</th><th>Responsável</th><th>Local / Obra</th><th>Acessórios</th><th>Data / Hora Retirada</th></tr></thead>
+            <tbody id="tabela-ativos"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3>📜 Histórico Geral de Devoluções</h3>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead><tr><th>Material</th><th>Responsável</th><th>Obra / Destino</th><th>Retirada</th><th>Devolução</th><th>Condição / Obs.</th></tr></thead>
+            <tbody id="tabela-historico"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA MATERIAIS -->
+    <div id="cad-materiais" class="tab-content">
+      <div class="card">
+        <h3>Novo Material / Ferramenta</h3>
+        <form id="form-mat" onsubmit="cadastrarMaterial(event)" class="grid-form">
+          <div><label for="mat_codigo">Código da Etiqueta (Ref.):</label><input type="text" id="mat_codigo" placeholder="Ex: FUR-003" required></div>
+          <div><label for="mat_categoria">Categoria:</label><input type="text" id="mat_categoria" placeholder="Ex: Ferramentas Elétricas" required></div>
+          <div class="full-width"><label for="mat_nome">Descrição / Nome do Equipamento:</label><input type="text" id="mat_nome" placeholder="Ex: Esmerilhadeira Bosch" required></div>
+          <div class="full-width"><button type="submit" class="btn-primary">CADASTRAR MATERIAL</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Materiais Cadastrados</h3>
+        <table>
+          <thead><tr><th>Código</th><th>Descrição</th><th>Categoria</th><th>Status</th></tr></thead>
+          <tbody id="tabela-materiais"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ABA FUNCIONÁRIOS -->
+    <div id="cad-funcionarios" class="tab-content">
+      <div class="card">
+        <h3>Novo Funcionário</h3>
+        <form id="form-func" onsubmit="cadastrarFuncionario(event)" class="grid-form">
+          <div><label for="func_nome">Nome Completo:</label><input type="text" id="func_nome" placeholder="Ex: Roberto Alves" required></div>
+          <div><label for="func_setor">Setor / Departamento:</label><input type="text" id="func_setor" placeholder="Ex: Acabamento" required></div>
+          <div class="full-width"><button type="submit" class="btn-primary">CADASTRAR FUNCIONÁRIO</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Funcionários Cadastrados</h3>
+        <table>
+          <thead><tr><th>Nome</th><th>Setor</th></tr></thead>
+          <tbody id="tabela-funcionarios"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+<script>
+    function openTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+
+      if (tabId === 'balcao') carregarSelecaoRapida();
+      if (tabId === 'historico') carregarHistorico();
+      if (tabId === 'cad-materiais') carregarListaMateriais();
+      if (tabId === 'cad-funcionarios') carregarListaFuncionarios();
+    }
+
+    function setHoraAtual() {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      document.getElementById('data_retirada').value = now.toISOString().slice(0, 16);
+    }
+
+    const inputCodigo = document.getElementById('codigo_ref');
+    const infoDiv = document.getElementById('material-info');
+    const statusDisplay = document.getElementById('status-display');
+    const formRetirada = document.getElementById('form-retirada');
+    const formDevolucao = document.getElementById('form-devolucao');
+    const selectFunc = document.getElementById('funcionario_select');
+    const suggestionsDiv = document.getElementById('suggestions');
+    let materialSelecionadoCodigo = '';
+
+    function carregarSelectFuncionarios() {
+      fetch('/api/funcionarios')
+        .then(r => r.json())
+        .then(data => {
+          selectFunc.innerHTML = data.map(f => `<option value="${f.id}">${f.nome} (${f.setor})</option>`).join('');
+        });
+    }
+
+    function carregarSelecaoRapida() {
+      fetch('/api/materiais')
+        .then(r => r.json())
+        .then(materiais => {
+          const grid = document.getElementById('quick-grid');
+          if (materiais.length === 0) {
+            grid.innerHTML = '<p style="color: #94a3b8; margin: 0;">Nenhum material cadastrado ainda.</p>';
+            return;
+          }
+          grid.innerHTML = materiais.map(m => `
+            <div class="quick-card" onclick="selecionarMaterial('${m.codigo_ref}')">
+              <div>
+                <div class="title">${m.nome}</div>
+                <div class="code">[${m.codigo_ref}] • ${m.categoria}</div>
+              </div>
+              <div style="margin-top: 10px;">
+                <span class="badge ${m.status === 'DISPONIVEL' ? 'badge-disponivel' : 'badge-emuso'}">
+                  ${m.status === 'DISPONIVEL' ? '✅ Disponível' : '⚠️ Em Posse'}
+                </span>
+              </div>
+            </div>
+          `).join('');
+        });
+    }
+
+    carregarSelectFuncionarios();
+    carregarSelecaoRapida();
+
+    function buscarSugestoes() {
+      const termo = inputCodigo.value.trim();
+      if (termo.length < 2) { suggestionsDiv.style.display = 'none'; return; }
+      fetch(`/api/materiais/busca/pesquisa?q=${encodeURIComponent(termo)}`)
+        .then(r => r.json())
+        .then(lista => {
+          if (lista.length === 0) { suggestionsDiv.style.display = 'none'; return; }
+          suggestionsDiv.innerHTML = lista.map(m => `
+            <div class="suggestion-item" onclick="selecionarMaterial('${m.codigo_ref}')">
+              <div><strong>${m.nome}</strong> <span style="color: #94a3b8; font-size: 13px;">[${m.codigo_ref}]</span></div>
+              <span class="badge ${m.status === 'DISPONIVEL' ? 'badge-disponivel' : 'badge-emuso'}">${m.status}</span>
+            </div>
+          `).join('');
+          suggestionsDiv.style.display = 'block';
+        });
+    }
+
+    inputCodigo.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        suggestionsDiv.style.display = 'none';
+        selecionarMaterial(inputCodigo.value.trim());
+      }
+    });
+
+    function selecionarMaterial(codigo) {
+      suggestionsDiv.style.display = 'none';
+      if (!codigo) return;
+      fetch(`/api/materiais/${encodeURIComponent(codigo)}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Material não encontrado');
+          return res.json();
+        })
+        .then(m => {
+          materialSelecionadoCodigo = m.codigo_ref;
+          inputCodigo.value = `${m.nome} (${m.codigo_ref})`;
+          infoDiv.style.display = 'block';
+
+          if (m.status === 'DISPONIVEL') {
+            statusDisplay.className = 'status-box disponivel';
+            statusDisplay.innerText = `✅ DISPONÍVEL: ${m.nome} [${m.categoria}]`;
+            formRetirada.style.display = 'grid';
+            formDevolucao.style.display = 'none';
+            setHoraAtual();
+            document.getElementById('confirma_responsavel').checked = false;
+          } else {
+            statusDisplay.className = 'status-box em-uso';
+            const dataFmt = new Date(m.data_retirada).toLocaleString('pt-BR');
+            statusDisplay.innerHTML = `
+              ⚠️ <strong>EM POSSE DE:</strong> ${m.usuario_atual}<br>
+              📅 <strong>Data de Retirada:</strong> ${dataFmt}<br>
+              📍 <strong>Destino:</strong> ${m.destino || 'Não informado'}<br>
+              🧰 <strong>Acessórios:</strong> ${m.acessorios || 'Nenhum'}
+            `;
+            formRetirada.style.display = 'none';
+            formDevolucao.style.display = 'block';
+          }
+        })
+        .catch(err => {
+          alert(err.message);
+          infoDiv.style.display = 'none';
+        });
+    }
+
+    function registrarRetirada() {
+      if (!document.getElementById('confirma_responsavel').checked) {
+        alert('É necessário marcar a caixa de confirmação do responsável antes de prosseguir.');
+        return;
+      }
+      const body = {
+        codigo_ref: materialSelecionadoCodigo,
+        funcionario_id: selectFunc.value,
+        data_retirada: document.getElementById('data_retirada').value,
+        destino: document.getElementById('destino').value,
+        acessorios: document.getElementById('acessorios').value,
+        observacao: document.getElementById('obs').value
+      };
+      fetch('/api/cautela/retirar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(r => r.json()).then(data => {
+        alert(data.message || data.error);
+        if (data.message) { limpar(); carregarSelecaoRapida(); }
+      });
+    }
+
+    function registrarDevolucao() {
+      const condicao = document.getElementById('condicao_devolucao').value;
+      fetch('/api/cautela/devolver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo_ref: materialSelecionadoCodigo, condicao_devolucao: condicao })
+      }).then(r => r.json()).then(data => {
+        alert(data.message || data.error);
+        if (data.message) { limpar(); carregarSelecaoRapida(); }
+      });
+    }
+
+    function limpar() {
+      inputCodigo.value = '';
+      materialSelecionadoCodigo = '';
+      document.getElementById('destino').value = '';
+      document.getElementById('acessorios').value = '';
+      document.getElementById('obs').value = '';
+      suggestionsDiv.style.display = 'none';
+      infoDiv.style.display = 'none';
+      inputCodigo.focus();
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#balcao')) suggestionsDiv.style.display = 'none';
+    });
+
+    function carregarHistorico() {
+      fetch('/api/historico')
+        .then(r => r.json())
+        .then(rows => {
+          const ativos = rows.filter(r => !r.data_devolucao);
+          const devolvidos = rows.filter(r => r.data_devolucao);
+
+          const tbodyAtivos = document.getElementById('tabela-ativos');
+          tbodyAtivos.innerHTML = ativos.length === 0 
+            ? '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Nenhum material emprestado no momento.</td></tr>'
+            : ativos.map(a => `
+              <tr>
+                <td><strong>${a.material_nome}</strong> <br><small style="color:#94a3b8;">[${a.codigo_ref}]</small></td>
+                <td>${a.funcionario_nome} <br><small style="color:#94a3b8;">(${a.funcionario_setor})</small></td>
+                <td>${a.destino || '-'}</td>
+                <td>${a.acessorios || '-'}</td>
+                <td>${new Date(a.data_retirada).toLocaleString('pt-BR')}</td>
+              </tr>
+            `).join('');
+
+          const tbodyHistorico = document.getElementById('tabela-historico');
+          tbodyHistorico.innerHTML = devolvidos.length === 0 
+            ? '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">Nenhum histórico de devolução ainda.</td></tr>'
+            : devolvidos.map(d => `
+              <tr>
+                <td><strong>${d.material_nome}</strong> <small style="color:#94a3b8;">[${d.codigo_ref}]</small></td>
+                <td>${d.funcionario_nome}</td>
+                <td>${d.destino || '-'}</td>
+                <td>${new Date(d.data_retirada).toLocaleString('pt-BR')}</td>
+                <td>${new Date(d.data_devolucao).toLocaleString('pt-BR')}</td>
+                <td>${d.condicao_devolucao || 'Devolvido em ordem'}</td>
+              </tr>
+            `).join('');
+        });
+    }
+
+    function cadastrarMaterial(e) {
+      e.preventDefault();
+      const body = {
+        codigo_ref: document.getElementById('mat_codigo').value,
+        categoria: document.getElementById('mat_categoria').value,
+        nome: document.getElementById('mat_nome').value
+      };
+      fetch('/api/materiais', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(r => r.json()).then(data => {
+        alert(data.message || data.error);
+        if (data.message) {
+          document.getElementById('form-mat').reset();
+          carregarListaMateriais();
+          carregarSelecaoRapida();
+        }
+      });
+    }
+
+    function carregarListaMateriais() {
+      fetch('/api/materiais')
+        .then(r => r.json())
+        .then(data => {
+          const tbody = document.getElementById('tabela-materiais');
+          tbody.innerHTML = data.map(m => `
+            <tr>
+              <td><strong>${m.codigo_ref}</strong></td>
+              <td>${m.nome}</td>
+              <td>${m.categoria}</td>
+              <td>
+                <span class="badge ${m.status === 'DISPONIVEL' ? 'badge-disponivel' : 'badge-emuso'}">
+                  ${m.status}
+                </span>
+              </td>
+            </tr>
+          `).join('');
+        });
+    }
+
+    function cadastrarFuncionario(e) {
+      e.preventDefault();
+      const body = {
+        nome: document.getElementById('func_nome').value,
+        setor: document.getElementById('func_setor').value
+      };
+      fetch('/api/funcionarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(r => r.json()).then(data => {
+        alert(data.message || data.error);
+        if (data.message) {
+          document.getElementById('form-func').reset();
+          carregarListaFuncionarios();
+          carregarSelectFuncionarios();
+        }
+      });
+    }
+
+    function carregarListaFuncionarios() {
+      fetch('/api/funcionarios')
+        .then(r => r.json())
+        .then(data => {
+          const tbody = document.getElementById('tabela-funcionarios');
+          tbody.innerHTML = data.map(f => `
+            <tr>
+              <td>${f.nome}</td>
+              <td>${f.setor}</td>
+            </tr>
+          `).join('');
+        });
+    }
+  </script>
+</body>
+</html>
