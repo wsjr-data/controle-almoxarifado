@@ -2,7 +2,7 @@ const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, 'almoxarifado.db');
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'almoxarifado.db');
 
 class DatabaseWrapper {
   constructor() {
@@ -20,7 +20,7 @@ class DatabaseWrapper {
       this.save();
     }
 
-    // Criar Tabelas com os novos campos de cautela detalhada
+    // Criar Tabelas com suporte a status de manutenção e auditoria de avarias
     this.db.run(`
       CREATE TABLE IF NOT EXISTS funcionarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +43,10 @@ class DatabaseWrapper {
         data_retirada DATETIME DEFAULT CURRENT_TIMESTAMP,
         data_devolucao DATETIME,
         observacao TEXT,
-        condicao_devolucao TEXT
+        condicao_devolucao TEXT,
+        tipo_ocorrencia TEXT DEFAULT 'SEM_AVARIA',
+        motivo_ocorrencia TEXT,
+        custo_providencia TEXT
       );
     `);
     this.save();

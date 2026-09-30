@@ -60,6 +60,25 @@
     .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
     .badge-disponivel { background-color: #064e3b; color: #34d399; }
     .badge-emuso { background-color: #450a0a; color: #fca5a5; }
+      .badge-manutencao { background-color: #422006; color: #fbbf24; }
+    .badge-danificado { background-color: #3f3f46; color: #e4e4e7; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+    .stat { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px; color: #94a3b8; font-size: 13px; }
+    .stat b { display: block; font-size: 28px; color: #f59e0b; }
+    .filtro { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .filtro > div { flex: 1; min-width: 150px; }
+    .filtro button { width: auto; margin: 0; }
+    #print-header { display: none; }
+    @media print {
+      body { background: #fff; color: #000; padding: 0; }
+      header, .tabs, .no-print, button { display: none !important; }
+      #print-header { display: block; margin-bottom: 12px; }
+      .card { background: #fff; border: 1px solid #999; break-inside: avoid; }
+      .stat { background: #fff; border-color: #999; color: #000; }
+      .stat b, th, h3 { color: #000; }
+      th { background: #eee; } td, th { border-color: #999; color: #000; }
+      .badge { background: #fff !important; color: #000 !important; border: 1px solid #000; }
+    }
   </style>
 </head>
 <body>
@@ -72,6 +91,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="openTab('balcao')">📦 Balcão (Cautela)</button>
       <button class="tab-btn" onclick="openTab('historico')">📜 Histórico & Relatórios</button>
+      <button class="tab-btn" onclick="openTab('balanco')">📊 Balanço Anual</button>
       <button class="tab-btn" onclick="openTab('cad-materiais')">🔨 Cadastrar Materiais</button>
       <button class="tab-btn" onclick="openTab('cad-funcionarios')">👥 Cadastrar Funcionários</button>
     </div>
@@ -107,9 +127,25 @@
 
           <div id="form-devolucao" style="display: none; margin-top: 20px;">
             <h3 style="color: #10b981; margin: 0 0 10px 0;">🔄 Processar Devolução</h3>
-            <label for="condicao_devolucao">Observação de Devolução / Estado do Item:</label>
+            <label for="tipo_ocorrencia">Estado de retorno:</label>
+            <select id="tipo_ocorrencia" onchange="document.getElementById('oc-campos').style.display = this.value === 'SEM_AVARIA' ? 'none' : 'block'">
+              <option value="SEM_AVARIA">Em ordem</option>
+              <option value="DANIFICADO">Danificado / com avaria (baixa)</option>
+              <option value="MANUTENCAO">Encaminhado para manutenção</option>
+            </select>
+            <div id="oc-campos" style="display: none; margin-top: 10px;">
+              <label for="oc_oque">O quê aconteceu?</label><input type="text" id="oc_oque">
+              <label for="oc_como" style="margin-top: 10px;">Como aconteceu?</label><input type="text" id="oc_como">
+              <label for="oc_porque" style="margin-top: 10px;">Por quê aconteceu?</label><input type="text" id="oc_porque">
+              <label for="oc_custo" style="margin-top: 10px;">Providência / custo (opcional):</label><input type="text" id="oc_custo">
+            </div>
+            <label for="condicao_devolucao" style="margin-top: 10px;">Observação de Devolução:</label>
             <input type="text" id="condicao_devolucao" placeholder="Ex: Devolvido completo sem avarias" value="Devolvido completo sem avarias">
             <button class="btn-checkin" onclick="registrarDevolucao()">CONFIRMAR DEVOLUÇÃO (REGISTRA HORÁRIO ATUAL)</button>
+          </div>
+
+          <div id="form-reativar" style="display: none; margin-top: 15px;">
+            <button class="btn-checkin" onclick="reativar()">LIBERAR PARA USO (volta a Disponível)</button>
           </div>
         </div>
       </div>
@@ -135,6 +171,30 @@
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- ABA BALANÇO -->
+    <div id="balanco" class="tab-content">
+      <div id="print-header"><h2>GM MÓVEIS – Balanço do Almoxarifado</h2><p id="ph-periodo"></p></div>
+      <div class="card"><h3>Estoque agora</h3><div class="stats" id="cards-estoque"></div></div>
+      <div class="card no-print"><div class="filtro">
+        <div><label for="f_ini">Data inicial</label><input type="date" id="f_ini"></div>
+        <div><label for="f_fim">Data final</label><input type="date" id="f_fim"></div>
+        <button class="btn-primary" onclick="carregarBalanco()">Filtrar</button>
+        <button class="btn-primary" onclick="periodo('passado')">Ano anterior</button>
+        <button class="btn-checkout" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+      </div></div>
+      <div class="card"><h3>Resumo do período</h3><div class="stats" id="cards-periodo"></div></div>
+      <div class="card"><h3>Relatório de avarias e ocorrências</h3>
+        <div style="overflow-x: auto;"><table>
+          <thead><tr><th>Quando</th><th>Material</th><th>Quem</th><th>Onde</th><th>Estado</th><th>Ocorrência</th><th>Providência / Custo</th></tr></thead>
+          <tbody id="tabela-ocorrencias"></tbody>
+        </table></div></div>
+      <div class="card"><h3>Movimentações no período</h3>
+        <div style="overflow-x: auto;"><table>
+          <thead><tr><th>Material</th><th>Responsável</th><th>Destino</th><th>Retirada</th><th>Devolução</th></tr></thead>
+          <tbody id="tabela-movs"></tbody>
+        </table></div></div>
     </div>
 
     <!-- ABA MATERIAIS -->
@@ -177,6 +237,15 @@
     </div>
   </div>
 <script>
+    const v = id => document.getElementById(id).value;
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+    const fmt = d => d ? new Date(d).toLocaleString('pt-BR') : '-';
+    const ST = {
+      DISPONIVEL: ['badge-disponivel', '✅ Disponível'], EM_USO: ['badge-emuso', '⚠️ Em uso'],
+      MANUTENCAO: ['badge-manutencao', '🔧 Manutenção'], DANIFICADO: ['badge-danificado', '⛔ Danificado / Baixa']
+    };
+    const badge = s => `<span class="badge ${(ST[s] || ['', ''])[0]}">${(ST[s] || ['', s])[1]}</span>`;
+
     function openTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -185,6 +254,7 @@
 
       if (tabId === 'balcao') carregarSelecaoRapida();
       if (tabId === 'historico') carregarHistorico();
+      if (tabId === 'balanco') carregarBalanco();
       if (tabId === 'cad-materiais') carregarListaMateriais();
       if (tabId === 'cad-funcionarios') carregarListaFuncionarios();
     }
@@ -228,9 +298,7 @@
                 <div class="code">[${m.codigo_ref}] • ${m.categoria}</div>
               </div>
               <div style="margin-top: 10px;">
-                <span class="badge ${m.status === 'DISPONIVEL' ? 'badge-disponivel' : 'badge-emuso'}">
-                  ${m.status === 'DISPONIVEL' ? '✅ Disponível' : '⚠️ Em Posse'}
-                </span>
+                ${badge(m.status)}
               </div>
             </div>
           `).join('');
@@ -250,7 +318,7 @@
           suggestionsDiv.innerHTML = lista.map(m => `
             <div class="suggestion-item" onclick="selecionarMaterial('${m.codigo_ref}')">
               <div><strong>${m.nome}</strong> <span style="color: #94a3b8; font-size: 13px;">[${m.codigo_ref}]</span></div>
-              <span class="badge ${m.status === 'DISPONIVEL' ? 'badge-disponivel' : 'badge-emuso'}">${m.status}</span>
+              ${badge(m.status)}
             </div>
           `).join('');
           suggestionsDiv.style.display = 'block';
@@ -274,6 +342,8 @@
         })
         .then(m => {
           materialSelecionadoCodigo = m.codigo_ref;
+          window.matId = m.id;
+          document.getElementById('form-reativar').style.display = 'none';
           inputCodigo.value = `${m.nome} (${m.codigo_ref})`;
           infoDiv.style.display = 'block';
 
@@ -284,6 +354,12 @@
             formDevolucao.style.display = 'none';
             setHoraAtual();
             document.getElementById('confirma_responsavel').checked = false;
+          } else if (m.status !== 'EM_USO') {
+            statusDisplay.className = 'status-box em-uso';
+            statusDisplay.innerHTML = `${badge(m.status)} ${esc(m.nome)} não pode ser retirado.`;
+            formRetirada.style.display = 'none';
+            formDevolucao.style.display = 'none';
+            document.getElementById('form-reativar').style.display = 'block';
           } else {
             statusDisplay.className = 'status-box em-uso';
             const dataFmt = new Date(m.data_retirada).toLocaleString('pt-BR');
@@ -331,14 +407,56 @@
       fetch('/api/cautela/devolver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigo_ref: materialSelecionadoCodigo, condicao_devolucao: condicao })
+        body: JSON.stringify({ codigo_ref: materialSelecionadoCodigo, condicao_devolucao: condicao, tipo_ocorrencia: v('tipo_ocorrencia'), o_que: v('oc_oque'), como: v('oc_como'), por_que: v('oc_porque'), custo_providencia: v('oc_custo') })
       }).then(r => r.json()).then(data => {
         alert(data.message || data.error);
         if (data.message) { limpar(); carregarSelecaoRapida(); }
       });
     }
 
+    function reativar() {
+      fetch('/api/materiais/alterar-status', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: window.matId, novo_status: 'DISPONIVEL' })
+      }).then(r => r.json()).then(d => { alert(d.message || d.error); limpar(); carregarSelecaoRapida(); });
+    }
+
+    function periodo(tipo) {
+      const y = new Date().getFullYear() - (tipo === 'passado' ? 1 : 0);
+      document.getElementById('f_ini').value = y + '-01-01';
+      document.getElementById('f_fim').value = tipo === 'passado' ? y + '-12-31' : new Date().toISOString().slice(0, 10);
+      carregarBalanco();
+    }
+
+    function carregarBalanco() {
+      if (!v('f_ini')) return periodo('atual');
+      const ini = v('f_ini'), fim = v('f_fim');
+      const br = d => d.split('-').reverse().join('/');
+      const stat = (n, l) => `<div class="stat"><b>${n}</b>${l}</div>`;
+      document.getElementById('ph-periodo').innerText = `Período: ${br(ini)} a ${br(fim)} — emitido em ${new Date().toLocaleString('pt-BR')}`;
+      fetch('/api/balanco/resumo').then(r => r.json()).then(s => {
+        document.getElementById('cards-estoque').innerHTML =
+          stat(s.total, 'Total') + stat(s.disponivel, 'Disponíveis') + stat(s.em_uso, 'Em uso') + stat(s.manutencao, 'Em manutenção') + stat(s.danificado, 'Danificados / baixa');
+      });
+      fetch(`/api/historico?inicio=${ini}&fim=${fim}`).then(r => r.json()).then(rows => {
+        const oc = rows.filter(r => r.tipo_ocorrencia && r.tipo_ocorrencia !== 'SEM_AVARIA' && r.data_devolucao
+          && r.data_devolucao.slice(0, 10) >= ini && r.data_devolucao.slice(0, 10) <= fim);
+        document.getElementById('cards-periodo').innerHTML =
+          stat(rows.length, 'Movimentações') + stat(rows.filter(r => r.data_devolucao).length, 'Devoluções') + stat(oc.length, 'Ocorrências');
+        const vazio = (n, t) => `<tr><td colspan="${n}" style="text-align: center; color: #94a3b8;">${t}</td></tr>`;
+        document.getElementById('tabela-ocorrencias').innerHTML = oc.length === 0 ? vazio(7, 'Nenhuma ocorrência no período.') : oc.map(o => `
+          <tr><td>${fmt(o.data_devolucao)}</td><td><strong>${esc(o.material_nome)}</strong> <small>[${esc(o.codigo_ref)}]</small></td>
+          <td>${esc(o.funcionario_nome)}</td><td>${esc(o.destino || '-')}</td><td>${badge(o.tipo_ocorrencia)}</td>
+          <td style="white-space: pre-line;">${esc(o.motivo_ocorrencia)}</td><td>${esc(o.custo_providencia || '-')}</td></tr>`).join('');
+        document.getElementById('tabela-movs').innerHTML = rows.length === 0 ? vazio(5, 'Nenhuma movimentação no período.') : rows.map(m => `
+          <tr><td>${esc(m.material_nome)} <small>[${esc(m.codigo_ref)}]</small></td><td>${esc(m.funcionario_nome)}</td>
+          <td>${esc(m.destino || '-')}</td><td>${fmt(m.data_retirada)}</td><td>${fmt(m.data_devolucao)}</td></tr>`).join('');
+      });
+    }
+
     function limpar() {
+      document.querySelectorAll('#oc-campos input').forEach(i => i.value = '');
+      const t = document.getElementById('tipo_ocorrencia'); t.value = 'SEM_AVARIA'; t.onchange();
       inputCodigo.value = '';
       materialSelecionadoCodigo = '';
       document.getElementById('destino').value = '';
@@ -383,7 +501,7 @@
                 <td>${d.destino || '-'}</td>
                 <td>${new Date(d.data_retirada).toLocaleString('pt-BR')}</td>
                 <td>${new Date(d.data_devolucao).toLocaleString('pt-BR')}</td>
-                <td>${d.condicao_devolucao || 'Devolvido em ordem'}</td>
+                <td>${esc(d.condicao_devolucao || 'Devolvido em ordem')} ${d.tipo_ocorrencia && d.tipo_ocorrencia !== 'SEM_AVARIA' ? badge(d.tipo_ocorrencia) : ''}</td>
               </tr>
             `).join('');
         });
@@ -421,9 +539,7 @@
               <td>${m.nome}</td>
               <td>${m.categoria}</td>
               <td>
-                <span class="badge ${m.status === 'DISPONIVEL' ? 'badge-disponivel' : 'badge-emuso'}">
-                  ${m.status}
-                </span>
+                ${badge(m.status)}
               </td>
             </tr>
           `).join('');
