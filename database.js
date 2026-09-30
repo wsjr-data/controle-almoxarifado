@@ -49,6 +49,16 @@ class DatabaseWrapper {
         custo_providencia TEXT
       );
     `);
+
+    // Padroniza todas as datas antigas para UTC ISO (com "Z"). Roda só nas linhas ainda fora do padrão.
+    this.db.run(`
+      UPDATE movimentacoes SET data_retirada = strftime('%Y-%m-%dT%H:%M:%fZ', data_retirada, '+3 hours')
+        WHERE data_retirada LIKE '%T%' AND data_retirada NOT LIKE '%Z';
+      UPDATE movimentacoes SET data_retirada = strftime('%Y-%m-%dT%H:%M:%fZ', data_retirada)
+        WHERE data_retirada NOT LIKE '%T%' AND data_retirada NOT LIKE '%Z';
+      UPDATE movimentacoes SET data_devolucao = strftime('%Y-%m-%dT%H:%M:%fZ', data_devolucao)
+        WHERE data_devolucao IS NOT NULL AND data_devolucao NOT LIKE '%Z';
+    `);
     this.save();
   }
 

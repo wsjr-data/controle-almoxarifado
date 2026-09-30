@@ -239,7 +239,9 @@
 <script>
     const v = id => document.getElementById(id).value;
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
-    const fmt = d => d ? new Date(d).toLocaleString('pt-BR') : '-';
+    const toDate = d => new Date(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(d) ? d.replace(' ', 'T') + 'Z' : d);
+    const fmt = d => d ? toDate(d).toLocaleString('pt-BR') : '-';
+    const dia = d => { const x = toDate(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
     const ST = {
       DISPONIVEL: ['badge-disponivel', '✅ Disponível'], EM_USO: ['badge-emuso', '⚠️ Em uso'],
       MANUTENCAO: ['badge-manutencao', '🔧 Manutenção'], DANIFICADO: ['badge-danificado', '⛔ Danificado / Baixa']
@@ -362,7 +364,7 @@
             document.getElementById('form-reativar').style.display = 'block';
           } else {
             statusDisplay.className = 'status-box em-uso';
-            const dataFmt = new Date(m.data_retirada).toLocaleString('pt-BR');
+            const dataFmt = fmt(m.data_retirada);
             statusDisplay.innerHTML = `
               ⚠️ <strong>EM POSSE DE:</strong> ${m.usuario_atual}<br>
               📅 <strong>Data de Retirada:</strong> ${dataFmt}<br>
@@ -387,7 +389,7 @@
       const body = {
         codigo_ref: materialSelecionadoCodigo,
         funcionario_id: selectFunc.value,
-        data_retirada: document.getElementById('data_retirada').value,
+        data_retirada: v('data_retirada') ? new Date(v('data_retirada')).toISOString() : '',
         destino: document.getElementById('destino').value,
         acessorios: document.getElementById('acessorios').value,
         observacao: document.getElementById('obs').value
@@ -424,7 +426,7 @@
     function periodo(tipo) {
       const y = new Date().getFullYear() - (tipo === 'passado' ? 1 : 0);
       document.getElementById('f_ini').value = y + '-01-01';
-      document.getElementById('f_fim').value = tipo === 'passado' ? y + '-12-31' : new Date().toISOString().slice(0, 10);
+      document.getElementById('f_fim').value = tipo === 'passado' ? y + '-12-31' : dia(new Date().toISOString());
       carregarBalanco();
     }
 
@@ -438,9 +440,9 @@
         document.getElementById('cards-estoque').innerHTML =
           stat(s.total, 'Total') + stat(s.disponivel, 'Disponíveis') + stat(s.em_uso, 'Em uso') + stat(s.manutencao, 'Em manutenção') + stat(s.danificado, 'Danificados / baixa');
       });
-      fetch(`/api/historico?inicio=${ini}&fim=${fim}`).then(r => r.json()).then(rows => {
+      fetch(`/api/historico?inicio=${encodeURIComponent(new Date(ini + 'T00:00:00').toISOString())}&fim=${encodeURIComponent(new Date(fim + 'T23:59:59.999').toISOString())}`).then(r => r.json()).then(rows => {
         const oc = rows.filter(r => r.tipo_ocorrencia && r.tipo_ocorrencia !== 'SEM_AVARIA' && r.data_devolucao
-          && r.data_devolucao.slice(0, 10) >= ini && r.data_devolucao.slice(0, 10) <= fim);
+          && dia(r.data_devolucao) >= ini && dia(r.data_devolucao) <= fim);
         document.getElementById('cards-periodo').innerHTML =
           stat(rows.length, 'Movimentações') + stat(rows.filter(r => r.data_devolucao).length, 'Devoluções') + stat(oc.length, 'Ocorrências');
         const vazio = (n, t) => `<tr><td colspan="${n}" style="text-align: center; color: #94a3b8;">${t}</td></tr>`;
@@ -487,7 +489,7 @@
                 <td>${a.funcionario_nome} <br><small style="color:#94a3b8;">(${a.funcionario_setor})</small></td>
                 <td>${a.destino || '-'}</td>
                 <td>${a.acessorios || '-'}</td>
-                <td>${new Date(a.data_retirada).toLocaleString('pt-BR')}</td>
+                <td>${fmt(a.data_retirada)}</td>
               </tr>
             `).join('');
 
@@ -499,8 +501,8 @@
                 <td><strong>${d.material_nome}</strong> <small style="color:#94a3b8;">[${d.codigo_ref}]</small></td>
                 <td>${d.funcionario_nome}</td>
                 <td>${d.destino || '-'}</td>
-                <td>${new Date(d.data_retirada).toLocaleString('pt-BR')}</td>
-                <td>${new Date(d.data_devolucao).toLocaleString('pt-BR')}</td>
+                <td>${fmt(d.data_retirada)}</td>
+                <td>${fmt(d.data_devolucao)}</td>
                 <td>${esc(d.condicao_devolucao || 'Devolvido em ordem')} ${d.tipo_ocorrencia && d.tipo_ocorrencia !== 'SEM_AVARIA' ? badge(d.tipo_ocorrencia) : ''}</td>
               </tr>
             `).join('');

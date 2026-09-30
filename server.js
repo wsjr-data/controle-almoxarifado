@@ -63,7 +63,7 @@ app.post('/api/cautela/retirar', (req, res) => {
     if (material.status === 'MANUTENCAO') return res.status(400).json({ error: 'Material está em manutenção e não pode ser retirado!' });
     if (material.status === 'DANIFICADO') return res.status(400).json({ error: 'Material está danificado/baixado!' });
 
-    const dataFinal = data_retirada || new Date().toISOString();
+    const dataFinal = data_retirada || new Date().toISOString(); // sempre UTC ISO
 
     db.run(
       `INSERT INTO movimentacoes (material_id, funcionario_id, acessorios, destino, observacao, data_retirada) 
@@ -93,7 +93,7 @@ app.post('/api/cautela/devolver', (req, res) => {
 
     const queryMov = `
       UPDATE movimentacoes 
-      SET data_devolucao = CURRENT_TIMESTAMP, 
+      SET data_devolucao = ?, 
           condicao_devolucao = ?,
           tipo_ocorrencia = ?,
           motivo_ocorrencia = ?,
@@ -109,7 +109,7 @@ app.post('/api/cautela/devolver', (req, res) => {
 
     db.run(
       queryMov, 
-      [condicao_devolucao || 'Devolvido em ordem', estadoFinal, motivo_ocorrencia || '', custo_providencia || '', material.id], 
+      [new Date().toISOString(), condicao_devolucao || 'Devolvido em ordem', estadoFinal, motivo_ocorrencia || '', custo_providencia || '', material.id], 
       function (err) {
         if (err) return res.status(500).json({ error: err.message });
 
@@ -158,8 +158,8 @@ app.get('/api/historico', (req, res) => {
     FROM movimentacoes mov
     JOIN materiais m ON mov.material_id = m.id
     JOIN funcionarios f ON mov.funcionario_id = f.id
-    WHERE (? = '' OR date(mov.data_retirada) <= ?)
-      AND (? = '' OR mov.data_devolucao IS NULL OR date(mov.data_devolucao) >= ?)
+    WHERE (? = '' OR datetime(mov.data_retirada) <= datetime(?))
+      AND (? = '' OR mov.data_devolucao IS NULL OR datetime(mov.data_devolucao) >= datetime(?))
     ORDER BY mov.id DESC
   `;
   const { inicio = '', fim = '' } = req.query;
